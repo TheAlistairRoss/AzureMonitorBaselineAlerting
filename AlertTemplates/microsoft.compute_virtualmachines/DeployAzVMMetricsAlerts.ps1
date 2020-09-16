@@ -45,8 +45,8 @@ $deploymentName = "microsoft.compute_virtualmachines_baseline_alerts-$dateTime"
 $HashArguments = @{
     Name                  = $deploymentName
     ResourceGroupName     = $resourceGroupName 
-    TemplateFile          = "microsoft.compute_virtualmachines_baseline_alerts_azure-deploy.json" 
-    TemplateParameterFile = "microsoft.compute_virtualmachines_baseline_alerts_azure-deploy.parameters.json"
+    TemplateFile          = "azure-deploy.json" 
+    TemplateParameterFile = "azure-deploy.parameters.json"
 }
 
 # Deploy
