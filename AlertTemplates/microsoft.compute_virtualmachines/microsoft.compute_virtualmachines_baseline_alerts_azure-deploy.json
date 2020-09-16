@@ -5,15 +5,8 @@
     "parameters": {
         "locations": {
             "type": "array",
-            "allowedValues": [
-                "uksouth",
-                "ukwest",
-                "northeurope",
-                "westeurope",
-                "centralus"
-            ],
             "metadata": {
-                "description": "Azure region in which target resources to be monitored are in (without spaces). For example: EastUS"
+                "description": "Azure region in which target resources to be monitored are in (without spaces). For example: 'EastUS' or 'westeurope,uksouth'"
             }
         },
         "multiResourceMetricAlertScope": {
