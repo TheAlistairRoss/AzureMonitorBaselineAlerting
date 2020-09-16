@@ -104,6 +104,7 @@ foreach ($oSubscription in $oSubscriptions)
         }      
         .\DeployAzVMMetricsAlerts.ps1 @DeployAzVMMetricsAlertsHashArguments
     }
+    Set-Location $oTemplateRootPath
 
 
 }
