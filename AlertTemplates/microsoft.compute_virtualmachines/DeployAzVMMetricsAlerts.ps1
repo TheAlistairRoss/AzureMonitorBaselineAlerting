@@ -39,7 +39,7 @@ $oParamsFile.parameters.multiResourceMetricAlertScope.value = $multiResourceMetr
 $oParamsFile | ConvertTo-Json -Depth 10 -EnumsAsStrings | Out-File -FilePath "microsoft.compute_virtualmachines_baseline_alerts_azure-deploy.parameters.json"
 
 $dateTime = Get-Date -Format "yyyyMMddhhmmss"
-$deploymentName = "microsoft.compute_virtualmachines_baseline_alerts_azure-deploy-$dateTime"
+$deploymentName = "microsoft.compute_virtualmachines_baseline_alerts-$dateTime"
 
 # Compile the arguments to a hashtable
 $HashArguments = @{
