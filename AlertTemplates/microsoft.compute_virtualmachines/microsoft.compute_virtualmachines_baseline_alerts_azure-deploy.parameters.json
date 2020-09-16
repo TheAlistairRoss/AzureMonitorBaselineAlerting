@@ -2,11 +2,11 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
   "parameters": {
     "multiResourceMetricAlertScope": {
-      "value": "/subscriptions/3ee0eb85-9e63-4cbd-8dab-fb0ce343b2cf"
+      "value": ""
     },
     "locations": {
       "value": [
-        "westeurope"
+        ""
       ]
     },
     "highProcessorUtilization_WindowSize": {
