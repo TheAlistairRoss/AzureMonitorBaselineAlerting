@@ -38,6 +38,14 @@ $oParamsFile.parameters.multiResourceMetricAlertScope.value = $multiResourceMetr
 # Export the converted Parameters file, otherwise the Powershell script needs to declare each parameter
 $oParamsFile | ConvertTo-Json -Depth 10 -EnumsAsStrings | Out-File -FilePath "microsoft.compute_virtualmachines_baseline_alerts_azure-deploy.parameters.json"
 
+$oTemplate = Get-Content -Path azure-deploy.json -Raw
+$oParemetersFinal = Get-Content -Path azure-deploy.parameters.json -Raw
+
+Write-Verbose "Template File`n"
+Write-Verbose $oTemplate
+Write-Verbose "`nParameters File`n"
+Write-Verbose $oParemetersFinal
+
 $dateTime = Get-Date -Format "yyyyMMddhhmmss"
 $deploymentName = "microsoft.compute_virtualmachines_baseline_alerts-$dateTime"
 
