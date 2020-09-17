@@ -12,22 +12,26 @@ param (
 )
 
 # Validate the input
-if ($virtualMachines){
+if ($virtualMachines)
+{
     $oVirtualMachines = $virtualMachines | Where-Object ResourceType -Like "Microsoft.Compute/virtualMachines"
-    if ($oVirtualMachines.count -lt 1){
+    if ($oVirtualMachines.count -lt 1)
+    {
         Write-Error -Message "No Virtual Machines found" -RecommendedAction Stop
         Exit
     }
 }   
-Write-Information "$($oVirtualMachines.count) Virtual Machines found"
+Write-Verbose "$($oVirtualMachines.count) Virtual Machines found"
 
 
 # Get Virtual Machines
 $oVirtualMachinesLocations = @()
-$oVirtualMachines.Location | Select-Object -Unique | Foreach-Object {$oVirtualMachinesLocations += $_}
-Write-Information "$($oVirtualMachinesLocations.count) unique locations for Virtual Machines found"
-$oVirtualMachinesLocations
-
+$oVirtualMachines.Location | Select-Object -Unique | ForEach-Object { $oVirtualMachinesLocations += $_ }
+Write-Verbose "$($oVirtualMachinesLocations.count) unique locations for Virtual Machines found"
+If ($VerbosePreference -notlike "SilentlyContinue")
+{
+    $oVirtualMachinesLocations
+}
 # Multi Resource Metrics
 # These should have 1 standard alert per region. Need to build some validation to identify whether a deployment is needed
 
@@ -58,5 +62,5 @@ $HashArguments = @{
 }
 
 # Deploy
-Write-Information "Deploying Virtual Machine Metrics Template"
+Write-Verbose "Deploying Virtual Machine Metrics Template"
 New-AzResourceGroupDeployment @HashArguments

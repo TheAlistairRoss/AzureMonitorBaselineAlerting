@@ -18,26 +18,33 @@ $oTemplateRootPath = Get-Location
 
 # Subscription Check
 $oAllSubscriptions = Get-AzSubscription
-if ($oAllSubscriptions.count -eq 0 -or !($oAllSubscriptions)){
+if ($oAllSubscriptions.count -eq 0 -or !($oAllSubscriptions))
+{
     Write-Error -Message "No Subscriptions found. Check Account Permissions"
     exit
 }
 
-if ($subscriptions){
-    $oSubscriptionsFilter = $subscriptions.Split(",") | ForEach-Object {$_.Trim()}
-    $oSubscriptions = $oAllSubscriptions | where {$_.Id.ToString() -In $oSubscriptionsFilter}
-    if ($oSubscriptions.count -lt 1){
-            Write-Error -Message "No Subscriptions filtered from the input parameters.`n'$subscriptions'"
+if ($subscriptions)
+{
+    $oSubscriptionsFilter = $subscriptions.Split(",") | ForEach-Object { $_.Trim() }
+    $oSubscriptions = $oAllSubscriptions | Where-Object { $_.Id.ToString() -In $oSubscriptionsFilter }
+    if ($oSubscriptions.count -lt 1)
+    {
+        Write-Error -Message "No Subscriptions filtered from the input parameters.`n'$subscriptions'"
     }
-    else {
-        Write-Information "$($oSubscriptions.count) subscription(s) found"
+    else
+    {
+        Write-Verbose "$($oSubscriptions.count) subscription(s) found"
     }
 }
-else {
+else
+{
     $oSubscriptions = $oAllSubscriptions
 }
-$oSubscriptions
-
+If ($VerbosePreference -notlike "SilentlyContinue")
+{
+    $oSubscriptions
+}
 foreach ($oSubscription in $oSubscriptions)
 {
     Set-AzContext -Subscription $oSubscription 
@@ -48,19 +55,26 @@ foreach ($oSubscription in $oSubscriptions)
     $oResourceGroup = Get-AzResourceGroup -Name $resourceGroupName
     if (!($oResourceGroup))
     {
-        Write-Information "Creating Resource Group"
-        Try{
-        New-AzResourceGroup -ResourceGroupName $resourceGroupName -Location $resourceGroupLocation -OutVariable $oResourceGroup -ErrorAction Stop
+        Write-Verbose "Creating Resource Group"
+        Try
+        {
+            New-AzResourceGroup -ResourceGroupName $resourceGroupName -Location $resourceGroupLocation -OutVariable $oResourceGroup -ErrorAction Stop
         }
-        catch{
+        catch
+        {
             $Error[0]
-            Write-Error -Message "Failed to deploy Resource Group '$($resourceGroupName). Ending deployment for subscription '($($oSubscription.Id)"
+            Write-Error -Message "Failed to deploy Resource Group '$($resourceGroupName)$($oSubscription.Id)"
             Break
         }
     }
-    else {
-        Write-Information "Resource Group Found"
-        $oResourceGroup
+    else
+    {
+        Write-Verbose "Resource Group Found"
+        If ($VerbosePreference -notlike "SilentlyContinue")
+        {
+
+            $oResourceGroup
+        }
         $resourceGroupLocation = $oResourceGroup.Location
     }
 
