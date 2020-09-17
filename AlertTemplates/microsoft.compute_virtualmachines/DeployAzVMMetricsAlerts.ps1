@@ -31,12 +31,12 @@ $oVirtualMachinesLocations
 # Multi Resource Metrics
 # These should have 1 standard alert per region. Need to build some validation to identify whether a deployment is needed
 
-$oParamsFile = Get-Content -Path "microsoft.compute_virtualmachines_baseline_alerts_azure-deploy.parameters.json" | ConvertFrom-Json -Depth 10
+$oParamsFile = Get-Content -Path "azure-deploy.parameters.json" | ConvertFrom-Json -Depth 10
 $oparamsFile.parameters.locations.value = $oVirtualMachinesLocations 
 $oParamsFile.parameters.multiResourceMetricAlertScope.value = $multiResourceMetricScope
 
 # Export the converted Parameters file, otherwise the Powershell script needs to declare each parameter
-$oParamsFile | ConvertTo-Json -Depth 10 -EnumsAsStrings | Out-File -FilePath "microsoft.compute_virtualmachines_baseline_alerts_azure-deploy.parameters.json"
+$oParamsFile | ConvertTo-Json -Depth 10 -EnumsAsStrings | Out-File -FilePath "azure-deploy.parameters.json"
 
 $oTemplate = Get-Content -Path azure-deploy.json -Raw
 $oParemetersFinal = Get-Content -Path azure-deploy.parameters.json -Raw
