@@ -1,14 +1,42 @@
+<#
+.SYNOPSIS
+    Deploys Baseline alerts for Azure Resources
+.DESCRIPTION
+    Long description
+.EXAMPLE
+        $Subscription = Get-AZSubscription | Select -first 1
+        $ResourceGroupName = "Contoso_Alerting_RG"
+        $ResourceGroupLocation = "uksouth"
+        .\DeployAzAlerts.ps1 -Subscription $Subscription -ResourceGroupName $ResourceGroupName -ResourceGroupLocation $ResourceGroupLocation
+.INPUTS
+    Inputs (if any)
+.OUTPUTS
+    Output (if any)
+.NOTES
+    General notes
+#>
 [CmdletBinding()]
 param (
+    [Parameter(Mandatory = $true)]
+    [Microsoft.Azure.Commands.Profile.Models.PSAzureSubscription]
+    $Subscriptions,
+
+    [Parameter(Mandatory = $true)]
     [string]
-    $subscriptions,
+    $ResourceGroupName,
 
     [string]
-    $resourceGroupName,
+    $ResourceGroupLocation
 
-    [string]
-    $resourceGroupLocation
 )
+
+# Validate PowerShell
+if ($PSVersionTable.PSVersion -lt $Version){
+        Write-Error "PowerShell Version is '$($PSVersionTable.PSVersion)' and requires upgrading to Version 6"
+        break
+}else {
+    Write-Verbose "PowerShell Version = $($PSVersionTable.PSVersion)"
+}
 
 # This needs to be update if automating with a service principal / app registration / managed identity
 # Connect-AzAccount 
@@ -17,110 +45,100 @@ param (
 $oTemplateRootPath = Get-Location
 
 # Subscription Check
-$oAllSubscriptions = Get-AzSubscription
-if ($oAllSubscriptions.count -eq 0 -or !($oAllSubscriptions))
+if (!($Subscriptions))
 {
-    Write-Error -Message "No Subscriptions found. Check Account Permissions"
-    exit
-}
-
-if ($subscriptions)
-{
-    $oSubscriptionsFilter = $subscriptions.Split(",") | ForEach-Object { $_.Trim() }
-    $oSubscriptions = $oAllSubscriptions | Where-Object { $_.Id.ToString() -In $oSubscriptionsFilter }
-    if ($oSubscriptions.count -lt 1)
+    $oAllSubscriptions = Get-AzSubscription
+    if ($oAllSubscriptions.count -eq 0 -or !($oAllSubscriptions))
     {
-        Write-Error -Message "No Subscriptions filtered from the input parameters.`n'$subscriptions'"
+        Write-Error -Message "No Subscriptions found. Check Account Permissions"
+        exit
     }
     else
     {
-        Write-Verbose "$($oSubscriptions.count) subscription(s) found"
+        $oSubscriptions = $oAllSubscriptions
     }
 }
 else
 {
-    $oSubscriptions = $oAllSubscriptions
+    $oSubscriptions = $Subscriptions
 }
-If ($VerbosePreference -notlike "SilentlyContinue")
+
+if ($VerbosePreference -notlike "SilentlyContinue")
 {
     $oSubscriptions
 }
+
 foreach ($oSubscription in $oSubscriptions)
 {
     Set-AzContext -Subscription $oSubscription 
     
-    $oSubscriptionScope = "/subscriptions/$($oSubscription.Id)"
 
     # Ensure the resource group exists, otherwise deploy it
-    $oResourceGroup = Get-AzResourceGroup -Name $resourceGroupName
+    Try{
+        $oResourceGroup = Get-AzResourceGroup -Name $ResourceGroupName
+    }
+    catch{}
     if (!($oResourceGroup))
     {
         Write-Verbose "Creating Resource Group"
         Try
         {
-            New-AzResourceGroup -ResourceGroupName $resourceGroupName -Location $resourceGroupLocation -OutVariable $oResourceGroup -ErrorAction Stop
+            New-AzResourceGroup -ResourceGroupName $ResourceGroupName -Location $ResourceGroupLocation -OutVariable $oResourceGroup -ErrorAction Stop
         }
         catch
         {
             $Error[0]
-            Write-Error -Message "Failed to deploy Resource Group '$($resourceGroupName)$($oSubscription.Id)"
-            Break
+            Write-Error -Message "Failed to deploy Resource Group '$($ResourceGroupName)$($oSubscription.Id)$($oSubscription.Name))"
+            break
         }
     }
     else
     {
         Write-Verbose "Resource Group Found"
-        If ($VerbosePreference -notlike "SilentlyContinue")
+        if ($VerbosePreference -notlike "SilentlyContinue")
         {
-
             $oResourceGroup
         }
-        $resourceGroupLocation = $oResourceGroup.Location
     }
 
     # Get All Resources in the subscription
     $oResources = Get-AzResource
-
-    
-    <# Need to have a think about the logic as a central workspace will hold all the alerts.
-    # Workspace Deployments
-    $oWorkspaces = $oResources | Where-Object -Property type -Like "Microsoft.OperationalInsights/workspaces"
-    if ($oWorkspaces)
+    if ($VerbosePreference -notlike "SilentlyContinue")
     {
-        foreach ($oWorkspace in $oWorkspaces)
-        {
-            $i = 1
-            $oParams = @{
-                "workspaceId"       = $oWorkspace.Id
-                "workspaceLocation" = $oWorkspace.Location
-            }
+        Write-Verbose "'$($Resource.Count)' resources found"
 
-            New-AzResourceGroupDeployment -ResourceGroupName $oResourceGroup.ResourceGroupName `
-                -TemplateFile "$($oPath)\Workspaces\azuredeploy.json" `
-                -TemplateParameterObject $oParams
-            $i++
-        }
+        $oResources | Group-Object -Property Type | Sort-Object -Property Count -Descending | Select-Object -Property Name,Count | Format-table -autosize
     }
 
-    # Log Alerts - To be deployed to the same location as a workspace
-    #>
-    # Virtual Machines
+    
+   # Virtual Machine Metric Alerts ######################### 
+   
     $oVirtualMachines = $oResources | Where-Object ResourceType -Like "Microsoft.Compute/virtualMachines"
         
     if ($oVirtualMachines)
     {
         $oVMPath = "$oTemplateRootPath\microsoft.compute_virtualmachines"
-        Set-Location $oVMPath
+        Try
+        {
+            Set-Location $oVMPath -ErrorAction Stop
+        }
+        catch
+        {
+            Write-Error $Error[0]
+            Write-Error -Message "Failed to set the location for virtual machines, ensure directoy and templates exsit"
+            break
+        }
 
         $DeployAzVMMetricsAlertsHashArguments = @{
-            virtualMachines          = $oVirtualMachines
-            multiResourceMetricScope = $oSubscriptionScope
-            resourceGroupName        = $oResourceGroup.ResourceGroupName
+            VirtualMachines = $oVirtualMachines
+            Subscription    = $oSubscription
+            ResourceGroup   = $oResourceGroup
         }      
         .\DeployAzVMMetricsAlerts.ps1 @DeployAzVMMetricsAlertsHashArguments
     }
-    Set-Location $oTemplateRootPath
 
+    # Log Alerts
+    Set-Location $oTemplateRootPath
 
 }
 
