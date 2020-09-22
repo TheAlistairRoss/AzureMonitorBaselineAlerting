@@ -77,8 +77,8 @@
         "locationCopy": [
             {
                 "name": "locationCopy",
-                "count": "[parameters('locations')]",
-                "input": "[concat('item', copyIndex('locationCopy'))]"
+                "count": "[length(parameters('locations'))]",
+                "input": "[parameters('locations')[copyIndex('locationCopy')]]"
             }
         ]
     },
