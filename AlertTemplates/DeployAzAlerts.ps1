@@ -75,7 +75,7 @@ foreach ($oSubscription in $oSubscriptions)
 
     # Ensure the resource group exists, otherwise deploy it
     Try{
-        $oResourceGroup = Get-AzResourceGroup -Name $ResourceGroupName
+        $oResourceGroup = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction Stop
     }
     catch{}
     if (!($oResourceGroup))
