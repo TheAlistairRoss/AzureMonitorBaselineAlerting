@@ -74,7 +74,7 @@
     },
     "variables": {
         "highProcessorUtilization_Name": "High Processor Utilization",
-        "locationCopy": [
+        "copy": [
             {
                 "name": "locationCopy",
                 "count": "[length(parameters('locations'))]",

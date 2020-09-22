@@ -18,7 +18,7 @@
 [CmdletBinding()]
 param (
     [Parameter(Mandatory = $true)]
-    [Microsoft.Azure.Commands.Profile.Models.PSAzureSubscription]
+    [Microsoft.Azure.Commands.Profile.Models.PSAzureSubscription[]]
     $Subscriptions,
 
     [Parameter(Mandatory = $true)]
