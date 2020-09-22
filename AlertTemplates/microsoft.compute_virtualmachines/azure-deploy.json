@@ -73,14 +73,21 @@
 
     },
     "variables": {
-        "highProcessorUtilization_Name": "High Processor Utilization"
+        "highProcessorUtilization_Name": "High Processor Utilization",
+        "locationCopy": [
+            {
+                "name": "locationCopy",
+                "count": "[parameters('locations')]",
+                "input": "[concat('item', copyIndex('locationCopy'))]"
+            }
+        ]
     },
     "resources": [
         //Multi-Resource Metric Alerts
         {
             "type": "microsoft.insights/metricAlerts",
             "apiVersion": "2018-03-01",
-            "name": "[concat(variables('highProcessorUtilization_Name'),'_',parameters('locations')[copyIndex(concat(variables('highProcessorUtilization_Name'),'_Copy'))])]",
+            "name": "[concat(variables('highProcessorUtilization_Name'),'_',parameters('locations')[copyIndex(0)])]",
             "location": "global",
             "tags": {},
             "properties": {
@@ -108,7 +115,7 @@
                 },
                 "autoMitigate": true,
                 "targetResourceType": "microsoft.compute/virtualmachines",
-                "targetResourceRegion": "[parameters('locations')[copyIndex(concat(variables('highProcessorUtilization_Name'),'_Copy'))]]",
+                "targetResourceRegion": "[parameters('locations')[copyIndex(0)]]",
                 "actions": [],
                 "description": "[concat('High Processor Utilization has been detected. The average value has been higher than ', parameters('highProcessorUtilization_Threshold'),', for the specified period of time')]"
             },
