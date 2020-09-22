@@ -1,3 +1,12 @@
 # AzureMonitorBaselineAlerting
 
-`.\DeployAzAlerts.ps1 -subscriptions 00000000-0000-0000-0000-000000000000 -resourceGroupName Contoso_Alerting -resourceGroupLocation uksouth -verbose`
+Deploys Baseline alerts for Azure Resources
+
+## EXAMPLE
+```
+$Subscription = Get-AZSubscription | Select -first 1
+$ResourceGroupName = "Contoso_Alerting_RG"
+$ResourceGroupLocation = "uksouth"
+.\DeployAzAlerts.ps1 -Subscription $Subscription -ResourceGroupName $ResourceGroupName -ResourceGroupLocation $ResourceGroupLocation 
+```
+
