@@ -77,13 +77,15 @@ foreach ($oSubscription in $oSubscriptions)
     Try{
         $oResourceGroup = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction Stop
     }
-    catch{}
+    catch{
+        Write-Verbose "Resource Group $ResourceGroupName does not exist. Creating Resource Group"
+    }
     if (!($oResourceGroup))
     {
         Write-Verbose "Creating Resource Group"
         Try
         {
-            New-AzResourceGroup -ResourceGroupName $ResourceGroupName -Location $ResourceGroupLocation -OutVariable $oResourceGroup -ErrorAction Stop
+            $oResourceGroup = New-AzResourceGroup -ResourceGroupName $ResourceGroupName -Location $ResourceGroupLocation -ErrorAction Stop
         }
         catch
         {
