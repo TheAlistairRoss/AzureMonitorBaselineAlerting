@@ -1,20 +1,58 @@
+<#
+.SYNOPSIS
+    Deploys multi-resource metrics alerts for Microsoft.Compute/virtualMachines
+.DESCRIPTION
+    This script receives Virtual Machines as a parameter input (from Get-AZResource | Where-Object ResourceType -Like "Microsoft.Compute/virtualMachines".
+    It then identifies the unique location for all virtual machines in the scope and updates the locations parameter in the ARM template parameters file with the locations as an array
+
+    It also takes the subscription Id and applies that as the Mutli-Resource Metric scope
+
+    This requires the file azure-deploy.json and azure-deploy_parameters.json. This script only updates the parameters "multiResourceMetricAlertScope (string)" and "locations (array)"
+.EXAMPLE
+    PS C:\> 
+        $Subscription = Get-AZSubscription | Select -first 1
+        $ResourceGroup = Get-AZResourceGroup -Name "Contoso_Alerting_RG"
+        $VMs = Get-AzResource | Where-Object ResourceType -Like "Microsoft.Compute/virtualMachines"
+        .\DeployAzVMMetricsAlerts.ps1 -Subscription $Subscription -Resource $ResourceGroup -VirtualMachines $VMs
+.INPUTS
+    Inputs (if any)
+.OUTPUTS
+
+.NOTES
+    Developed by Alistair Ross [MSFT]
+    
+#>
+
 [CmdletBinding()]
 param (
+    [Parameter(Mandatory=$true)]
+    [Microsoft.Azure.Commands.Profile.Models.PSAzureSubscription]
+    $Subscription,
+    [Parameter(Mandatory=$true)]
+    [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]
+    $ResourceGroup,
+    [Parameter(Mandatory=$true)]
     [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResource[]]
-    $virtualMachines,
-
-    [string]
-    $multiResourceMetricScope,
-
-    [string]
-    $resourceGroupName
+    $VirtualMachines
 
 )
 
+$oTemplateFileName = "azure-deploy.json"
+$oTemplateParametersFileName = "azure-deploy.parameters.json"
+
+"$oTemplateFileName", "$oTemplateParametersFileName" | ForEach-Object {
+    If ((Test-Path -Path $_) -eq $false)
+    {
+        Write-Error "Path '$_' not found. Ensure valid template and params file is in the same directory"
+        Break
+    }
+}
+
+
 # Validate the input
-if ($virtualMachines)
+if ($VirtualMachines)
 {
-    $oVirtualMachines = $virtualMachines | Where-Object ResourceType -Like "Microsoft.Compute/virtualMachines"
+    $oVirtualMachines = $VirtualMachines | Where-Object ResourceType -Like "Microsoft.Compute/virtualMachines"
     if ($oVirtualMachines.count -lt 1)
     {
         Write-Error -Message "No Virtual Machines found" -RecommendedAction Stop
@@ -22,6 +60,11 @@ if ($virtualMachines)
     }
 }   
 Write-Verbose "$($oVirtualMachines.count) Virtual Machines found"
+
+$oSubscriptionScope = "/subscriptions/$($subscription.Id)"
+Write-Verbose "Scope set to Subscription '$oSubscriptionScope ' ($($Subscription.Name)"
+
+Write-Verbose "Resource Group Deployment to '$($ResourceGroup.ResourceGroupName)'"
 
 
 # Get Virtual Machines
@@ -32,35 +75,42 @@ If ($VerbosePreference -notlike "SilentlyContinue")
 {
     $oVirtualMachinesLocations
 }
+
 # Multi Resource Metrics
-# These should have 1 standard alert per region. Need to build some validation to identify whether a deployment is needed
+# Get the Params file and build
 
-$oParamsFile = Get-Content -Path "azure-deploy.parameters.json" | ConvertFrom-Json -Depth 10
+# New Dynamic test
+$oParamsFile = Get-Content -Path $oTemplateParametersFileName | ConvertFrom-Json -Depth 10 -AsHashtable
 $oparamsFile.parameters.locations.value = $oVirtualMachinesLocations 
-$oParamsFile.parameters.multiResourceMetricAlertScope.value = $multiResourceMetricScope
+$oParamsFile.parameters.multiResourceMetricAlertScope.value = $oSubscriptionScope
 
-# Export the converted Parameters file, otherwise the Powershell script needs to declare each parameter
-$oParamsFile | ConvertTo-Json -Depth 10 -EnumsAsStrings | Out-File -FilePath "azure-deploy.parameters.json"
-
-$oTemplate = Get-Content -Path azure-deploy.json -Raw
-$oParemetersFinal = Get-Content -Path azure-deploy.parameters.json -Raw
-
-Write-Verbose "Template File`n"
-Write-Verbose $oTemplate
-Write-Verbose "`nParameters File`n"
-Write-Verbose $oParemetersFinal
 
 $dateTime = Get-Date -Format "yyyyMMddhhmmss"
 $deploymentName = "microsoft.compute_virtualmachines_baseline_alerts-$dateTime"
 
+
 # Compile the arguments to a hashtable
 $HashArguments = @{
     Name                  = $deploymentName
-    ResourceGroupName     = $resourceGroupName 
-    TemplateFile          = "azure-deploy.json" 
-    TemplateParameterFile = "azure-deploy.parameters.json"
+    ResourceGroupName     = $ResourceGroup.ResourceGroupName
+    TemplateFile          = $oTemplateFileName 
+    TemplateParameterObject = $oParamsFile.parameters
 }
 
-# Deploy
-Write-Verbose "Deploying Virtual Machine Metrics Template"
+$oParamsFileKeys = $oParamsFile.parameters.keys -split "`n"
+
+Foreach ($oKey in $oParamsFileKeys){
+        $HashArguments.Add($oKey, $oParamsFile.parameters.$oKey.value)
+}
+
+$oTemplate = Get-Content -Path $oTemplateFileName -Raw
+$oParametersFinal = $oParamsFile |ConvertTo-Json
+
+Write-Verbose "Template File`n"
+Write-Verbose $oTemplate
+Write-Verbose "`nParameters File`n"
+Write-Verbose $oParametersFinal
+
 New-AzResourceGroupDeployment @HashArguments
+
+
