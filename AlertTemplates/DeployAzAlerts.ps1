@@ -29,50 +29,53 @@ param (
     $ResourceGroupLocation
 
 )
-# Template directory hash. Only change this!
-$oTemplatesHash = @{
-    "Microsoft.Compute/virtualMachines" = @{
-        "directory"  = "Microsoft.Compute_VirtualMachines"
-        "scriptName" = "DeployAzVMAlerts.ps1"
-        "pathTest"   = $false
-    }
-}
 
 Write-Verbose "`n`n`n## DeployAzAlerts Start ##################################################################`n"
+
+## Test each File Path
+$oConfigFile = "DeployAzAlerts.config.json"
+$oConfig = Get-Content $oConfigFile | ConvertFrom-Json -AsHashtable
+
+Foreach ($oConfigResourceType in $oConfig.keys)
+{
+    foreach ($oScript in $oConfig.$oConfigResourceType.scripts)
+    {
+        $oPath = "$PSScriptRoot\$($oConfig.$oConfigResourceType.resourceScriptdirectory)\$($oConfig.$oConfigResourceType.resourceScriptDirectory)\$($oScript.directory)\$($oScript.scriptName)"
+        If ((Test-Path -Path $oPath) -eq $false)
+        {
+            $oErrorString = "Path '$oPath' not found. Ensure valid template directory." 
+            Write-Error -Message $oErrorString
+            $oScript.pathTest = $false
+        }
+        else
+        {
+            $oVerboseString = "Path '$oPath' found." 
+            Write-Verbose $oVerboseString
+            $oScript.scriptName = $oPath
+            $oScript.pathTest = $true
+        }
+    }
+}
+$oVerboseString = "Path Test Results"
+Write-Verbose $oVerboseString
+$oConfig | ConvertTo-Json -EnumsAsString | Write-Verbose 
+
 
 # Validate PowerShell
 if ($PSVersionTable.PSVersion -lt $Version)
 {
-    Write-Error "PowerShell Version is '$($PSVersionTable.PSVersion)' and requires upgrading to Version 6"
-    break
+    $oErrorString = "PowerShell Version is '$($PSVersionTable.PSVersion)' and requires upgrading to Version 6"
+    Write-Error -Message $oErrorString
+    Exit
 }
 else
 {
-    Write-Verbose "PowerShell Version = $($PSVersionTable.PSVersion)"
+    $oVerboseString = "PowerShell Version = $($PSVersionTable.PSVersion)"
+    Write-Verbose $oVerboseString
 }
 
 # This needs to be update if automating with a service principal / app registration / managed identity
 # Connect-AzAccount 
-
-Foreach ($oTemplateResourceType in $oTemplatesHash.keys)
-{
-    $oPath = "$PSScriptRoot\$($oTemplatesHash.$oTemplateResourceType.directory)\$($oTemplatesHash.$oTemplateResourceType.scriptName)"
-    If ((Test-Path -Path $oPath) -eq $false)
-    {
-        Write-Error "Path '$oPath' not found. Ensure valid template directory"
-        $oTemplatesHash.$oTemplateResourceType.pathTest = $false
-        Break
-    }
-    else
-    {
-        Write-Verbose "Path '$oTemplateResourceType' found. "
-        $oTemplatesHash.$oTemplateResourceType.scriptName = $oPath
-        $oTemplatesHash.$oTemplateResourceType.pathTest = $true
-    }
-}
-
-Write-Verbose "Path test Results"
-$oTemplatesHash | ConvertTo-Json -EnumsAsString | Write-Verbose 
 
 
 # Subscription Check
@@ -81,7 +84,8 @@ if (!($Subscriptions))
     $oAllSubscriptions = Get-AzSubscription
     if ($oAllSubscriptions.count -eq 0 -or !($oAllSubscriptions))
     {
-        Write-Error -Message "No Subscriptions found. Check Account Permissions"
+        $oErrorString = "No Subscriptions found. Check Account Permissions"
+        Write-Error -Message $oErrorString
         exit
     }
     else
@@ -94,43 +98,48 @@ else
     $oSubscriptions = $Subscriptions
 }
 
-Write-Verbose "Processing '$($oSubscriptions.count)' subscriptions"
+$oVerboseString = "Processing '$($oSubscriptions.count)' subscriptions"
+Write-Verbose $oVerboseString 
 $oSubscriptions | Out-String | Write-Verbose
 
 foreach ($oSubscription in $oSubscriptions)
 {
+    $oHostString = "Setting Context to Subscription: $($oSubscription.Name) '$($oSubscription.Id)'"
+    Write-Host $oHostString -ForegroundColor Magenta
     $Context = Set-AzContext -Subscription $oSubscription 
-    Write-Host "Context set to Subscription: $($oSubscription.Name) '$($oSubscription.Id)'" -ForegroundColor Magenta
-
     $Context | Out-String | Write-Verbose
         
 
     # Ensure the resource group exists, otherwise deploy it
     Try
     {
-        $oResourceGroup = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction Stop
+        $oResourceGroup = Get-AzResourceGroup $ResourceGroupName -ErrorAction Stop
     }
     catch
     {
-        Write-Host "Resource Group $ResourceGroupName does not exist. Creating Resource Group" -ForegroundColor Blue
+        $oHostString = "Resource Group '$ResourceGroupName' not found. Creating Resource Group"
+        Write-Host $oHostString -ForegroundColor Blue
     }
     if (!($oResourceGroup))
     {
-        Write-Verbose "Creating Resource Group"
+        $oVerboseString = "Creating Resource Group"
+        Write-Verbose $oVerboseString
         Try
         {
             $oResourceGroup = New-AzResourceGroup -ResourceGroupName $ResourceGroupName -Location $ResourceGroupLocation -ErrorAction Stop
         }
         catch
         {
-            $Error[0]
-            Write-Error -Message "Failed to deploy Resource Group '$($ResourceGroupName)$($oSubscription.Id)$($oSubscription.Name))"
-            break
+            Write-Error $Error[0]
+            $oErrorString = "Failed to deploy Resource Group '$($ResourceGroupName)$($oSubscription.Id)$($oSubscription.Name))"
+            Write-Error -Message $oErrorString
+            Break
         }
     }
     else
     {
-        Write-Verbose "Resource Group Found"
+        $oVerboseString = "Resource Group Found"
+        Write-Verbose $oVerboseString
         $oResourceGroup | Out-String | Write-Verbose
     }
 
@@ -138,32 +147,41 @@ foreach ($oSubscription in $oSubscriptions)
     $oResources = Get-AzResource
     if ($VerbosePreference -notlike "SilentlyContinue")
     {
-        Write-Verbose "'$($oResources.Count)' resources found"
-
+        $oVerboseString = "'$($oResources.Count)' resources found"
+        Write-Verbose $oVerboseString
         $oResources | Group-Object -Property Type | Sort-Object -Property Count -Descending | Select-Object -Property Name, Count | Format-Table -AutoSize | Out-String | Write-Verbose
     }
     
-    foreach ($oResourceType in $oTemplatesHash.Keys)
+    foreach ($oResourceType in $oConfig.Keys)
     {
-        Write-Host "Initialising Alert Deployment for Resource Type: '$oResourceType'" -ForegroundColor Magenta
-        $oFilteredResources = $oResources | Where-Object ResourceType -Like $oResourceType
+        $oHostString = "Initialising Alert Deployment for Resource Type: '$oResourceType'"
+        Write-Host $oHostString -ForegroundColor Magenta
+        $oFilteredResources = $oResources | Where-Object -Property ResourceType -Like -Value $oResourceType
         if ($oFilteredResources)
         {
-            Write-Verbose "'$($oFilteredResources.Count)$oResourceType' found"
-            if ($oTemplatesHash.$oResourceType.pathTest -eq $true )
-            {
-                $oCommand = "$($oTemplatesHash.$oResourceType.scriptName)" 
-                $oVerboseString = "Executing Script: $oCommand" + ' -Subscription $Subscription -ResourceGroup $oResourceGroup -Resources $oFilteredResources'
-                Write-Verbose $oVerboseString
+            $oVerboseString = "'$($oFilteredResources.Count)' of Resource Type '$oResourceType' found"
+            Write-Verbose $oVerboseString
 
-                & $oCommand -Subscription $Subscription -ResourceGroup $oResourceGroup -Resources $oFilteredResources 
+            foreach ($oScript in $oConfig.$oResourceType.scripts)
+            {
+                if ($oScript.pathTest -like $true)
+                {
+                    $oCommand = "$($oScript.scriptName)"
+
+                    $oVerboseString = "Script: $oCommand -Subscription `$oSubscription -ResourceGroup `$oResourceGroup -Resources `$oFilteredResources"
+                    Write-Verbose $oVerboseString
+
+                    & $oCommand -Subscription $oSubscription -ResourceGroup $oResourceGroup -Resources $oFilteredResources 
+                }
             }
         }
         else
         {
-            Write-Verbose "No Resources of Type '$oResourceType' found."
+            $oHostString = "No Resources of Type '$oResourceType' found." 
+            Write-Host $oHostString -ForegroundColor Blue
         }
     }
+        
 }
 
-    Write-Verbose "`n`n`n## DeployAzAlerts End ##################################################################`n"
+Write-Verbose "`n`n`n## DeployAzAlerts End ##################################################################`n"

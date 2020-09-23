@@ -1,0 +1,18 @@
+{
+    "Microsoft.Compute/virtualMachines": {
+        "resourceDisplayName": "Azure VirtualMachine",
+        "resourceScriptDirectory": "Microsoft.Compute_virtualMachines",
+        "scripts": [
+            {
+                "directory": "multiResourceMetrics",
+                "scriptName": "DeployAzMultiResourceMetrics.ps1",
+                "pathTest": "false"
+            },
+            {
+                "directory": "metrics",
+                "scriptName": "DeployAzMetricsAlerts.ps1",
+                "pathTest": "false"
+            }
+        ]
+    }
+}

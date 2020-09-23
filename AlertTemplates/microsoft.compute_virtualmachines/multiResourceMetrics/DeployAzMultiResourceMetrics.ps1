@@ -15,64 +15,68 @@ param (
 )
 Write-Verbose "`n`n`n## DeployAzMultiResourceMetrics Start ##################################################################`n"
 
+## Validate Resources
+$oVerboseString = "'$($Resources.Count)' of Resources"
+Write-Verbose $oVerboseString
+$oVerboseString = $Resources | Select-Object Name, ResourceType, ResourceGroupName | Out-String
+Write-Verbose $oVerboseString
 
+$oResourceTypeUnique = $Resource | Select-Object -Property ResourceType -Unique
+if ($oResourceTypeUnique.count -gt 1 )
+{
+    $oResourceTypeUniqueString = $oResourceTypeUnique | Out-String
+    $oErrorString = "More than 1 Resource Type specified, only pass one resource type to this function`n`n $oResourceTypeUniqueString"
+    Write-Error -Message $oErrorString
+    Exit
+}
+else
+{
+    $oVerboseString = "Deploying Multi Resource Metrics for Resource type '$oResourceTypeUnique'"
+    Write-Verbose $oVerboseString
+}
 
 # Validate Template Files
-$oTemplateFileName = "$PSScriptRoot/azure-deploy.json"
-$oTemplateParametersFileName = "$PSScriptRoot/azure-deploy.parameters.json"
+$oTemplateFileName = "$PSScriptRoot\azure-deploy.json"
+$oTemplateParametersFileName = "$PSScriptRoot\azure-deploy.parameters.json"
 
 @($oTemplateFileName , $oTemplateParametersFileName) | ForEach-Object {
     If ((Test-Path -Path $_) -eq $false)
     {
         Write-Error "File '$_' not found. Ensure valid template and params file are created and rerun script"
-        Break
+        Exit
     }
     else
     {
-        Write-Verbose "Path '$_' found"
+        $oVerboseString = "Path '$_' found"
+        Write-Verbose $oVerboseString
     }
-}
-#Validate only one Resource Type
-
-$oResourceTypeUnqiue = $Resources | Select-Object -Property ResourceType -Unique
-if ($oResourceTypeUnique.count -gt 1 )
-{
-    Write-Error -Message "More than 1 Resource Type specified, only pass one resource type to this function"
-    $oResourceTypeUnqiue | ForEach-Object { Write-Error -Message "$_" } 
-    break
-}
-else
-{
-    Write-Verbose "Deploying Multi Resource Metrics for Resource type $oResourceTypeUnique"
 }
 
 
 # Build the subscription scope
 $oSubscriptionScope = "/subscriptions/$($subscription.Id)"
-Write-Verbose "Scope set to Subscription '$oSubscriptionScope $($Subscription.Name)"
-
-Write-Verbose "Resource Group Deployment to '$($ResourceGroup.ResourceGroupName)'"
+$oVerboseString = "Scope set to Subscription '$oSubscriptionScope $($Subscription.Name)"
+Write-Verbose $oVerboseString
+$oVerboseString = "Resource Group Deployment to '$($ResourceGroup.ResourceGroupName)'"
+Write-Verbose $oVerboseString
 
 # Get Resources Unique Locations
 $oResourceLocations = @()
 $Resources.Location | Select-Object -Unique | ForEach-Object { $oResourceLocations += $_ }
-Write-Verbose "$($oResourceLocations.count) unique locations for resource type found"
-If ($VerbosePreference -notlike "SilentlyContinue")
-{
-    $oResourceLocations
-}
+$oVerboseString = "'$($oResourceLocations.count)' unique locations for resource type found"
+Write-Verbose $oVerboseString
+$oResourceLocations |out-string |Write-Verbose
 
 $oParamsFile = Get-Content -Path $oTemplateParametersFileName | ConvertFrom-Json -AsHashtable
 $oparamsFile.parameters.locations.value = $oResourceLocations 
 $oParamsFile.parameters.multiResourceMetricAlertScope.value = $oSubscriptionScope
 
-
-$dateTime = Get-Date -Format "yyyyMMddhhmmss"
-$deploymentName = "multiResourceMetric_alerts-$dateTime"
+$oDateTime = Get-Date -Format "yyyyMMddhhmmss"
+$oDeploymentName = "multiResourceMetric_alerts-$oDateTime"
 
 # Compile the arguments to a hashtable
 $HashArguments = @{
-    Name                    = $deploymentName
+    Name                    = $oDeploymentName
     ResourceGroupName       = $ResourceGroup.ResourceGroupName
     TemplateFile            = $oTemplateFileName 
     TemplateParameterObject = $oParamsFile.parameters
@@ -85,18 +89,19 @@ Foreach ($oKey in $oParamsFileKeys)
     $HashArguments.Add($oKey, $oParamsFile.parameters.$oKey.value)
 }
 
-If ($VerbosePreference -notlike "SilentlyContinue")
+If ($DebugPreference -notlike "SilentlyContinue")
 {
     $oTemplate = Get-Content -Path $oTemplateFileName -Raw
     $oParametersFinal = $oParamsFile | ConvertTo-Json
 
-    Write-Verbose "`n## Template File ####################################################################`n"
-    Write-Verbose $oTemplate
-    Write-Verbose "`n## Parameters File ##################################################################`n"
-    Write-Verbose $oParametersFinal
+    Write-Debug "`n## Template File ####################################################################`n"
+    Write-Debug $oTemplate
+    Write-Debug "`n## Parameters File ##################################################################`n"
+    Write-Debug $oParametersFinal
 }
 
-Write-Host "Deploying Multi Resource Metrics to Scope '$oSubscriptionScope'" -Foregroundcolor Magenta
+$oHostString = "Deploying Multi Resource Metrics to Scope '$oSubscriptionScope'" 
+Write-Host $oHostString -Foregroundcolor Magenta
 New-AzResourceGroupDeployment @HashArguments
 
 Write-Verbose "`n`n`n## DeployAzMultiResourceMetrics End ##################################################################`n"

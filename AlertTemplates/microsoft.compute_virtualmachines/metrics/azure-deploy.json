@@ -58,7 +58,7 @@
         }
     },
     "variables": {
-        "memoryAvaliableBytes_name": "Memory Bytes Alert"
+        "memoryAvaliableBytes_name": "[concat('Memory Bytes Alert','-',guid(parameters('resourceId')))]"
     },
     "resources": [
         {
