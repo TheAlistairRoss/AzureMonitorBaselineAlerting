@@ -1,0 +1,22 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "resourceId": {
+            "value": "" // TODO: Fill in parameter value
+        },
+        "memoryAvaliableBytes_Threshold": {
+            "value": 2147483648
+        },
+        "memoryAvaliableBytes_WindowSize": {
+            "value": "PT15M"
+        },
+        "memoryAvaliableBytes_EvaluationFrequency": {
+            "value": "PT15M"
+        },
+        "memoryAvaliableBytes_alertSeverity": {
+            "value": 3
+        }
+
+    }
+}

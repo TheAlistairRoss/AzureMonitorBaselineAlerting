@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "parameters": {
+    "multiResourceMetricAlertScope": {
+      "value": "/subscriptions/b7dfa339-616d-4bb2-bc13-d0cf18a7fa38"
+    },
+    "locations": {
+      "value": [
+        "westeurope",
+        "centralus",
+        "uksouth"
+      ]
+    },
+    "highProcessorUtilization_WindowSize": {
+      "value": "PT15M"
+    },
+    "highProcessorUtilization_EvaluationFrequency": {
+      "value": "PT15M"
+    },
+    "highProcessorUtilization_Threshold": {
+      "value": 70
+    },
+    "highProcessorUtilization_alertSeverity": {
+      "value": 3
+    }
+  },
+  "contentVersion": "1.0.0.0"
+}

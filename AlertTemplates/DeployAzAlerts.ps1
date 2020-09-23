@@ -29,20 +29,51 @@ param (
     $ResourceGroupLocation
 
 )
+# Template directory hash. Only change this!
+$oTemplatesHash = @{
+    "Microsoft.Compute/virtualMachines" = @{
+        "directory"  = "Microsoft.Compute_VirtualMachines"
+        "scriptName" = "DeployAzVMAlerts.ps1"
+        "pathTest"   = $false
+    }
+}
+
+Write-Verbose "`n`n`n## DeployAzAlerts Start ##################################################################`n"
 
 # Validate PowerShell
-if ($PSVersionTable.PSVersion -lt $Version){
-        Write-Error "PowerShell Version is '$($PSVersionTable.PSVersion)' and requires upgrading to Version 6"
-        break
-}else {
+if ($PSVersionTable.PSVersion -lt $Version)
+{
+    Write-Error "PowerShell Version is '$($PSVersionTable.PSVersion)' and requires upgrading to Version 6"
+    break
+}
+else
+{
     Write-Verbose "PowerShell Version = $($PSVersionTable.PSVersion)"
 }
 
 # This needs to be update if automating with a service principal / app registration / managed identity
 # Connect-AzAccount 
 
-# Root Path
-$oTemplateRootPath = Get-Location
+Foreach ($oTemplateResourceType in $oTemplatesHash.keys)
+{
+    $oPath = "$PSScriptRoot\$($oTemplatesHash.$oTemplateResourceType.directory)\$($oTemplatesHash.$oTemplateResourceType.scriptName)"
+    If ((Test-Path -Path $oPath) -eq $false)
+    {
+        Write-Error "Path '$oPath' not found. Ensure valid template directory"
+        $oTemplatesHash.$oTemplateResourceType.pathTest = $false
+        Break
+    }
+    else
+    {
+        Write-Verbose "Path '$oTemplateResourceType' found. "
+        $oTemplatesHash.$oTemplateResourceType.scriptName = $oPath
+        $oTemplatesHash.$oTemplateResourceType.pathTest = $true
+    }
+}
+
+Write-Verbose "Path test Results"
+$oTemplatesHash | ConvertTo-Json -EnumsAsString | Write-Verbose 
+
 
 # Subscription Check
 if (!($Subscriptions))
@@ -63,22 +94,25 @@ else
     $oSubscriptions = $Subscriptions
 }
 
-if ($VerbosePreference -notlike "SilentlyContinue")
-{
-    $oSubscriptions
-}
+Write-Verbose "Processing '$($oSubscriptions.count)' subscriptions"
+$oSubscriptions | Out-String | Write-Verbose
 
 foreach ($oSubscription in $oSubscriptions)
 {
-    Set-AzContext -Subscription $oSubscription 
-    
+    $Context = Set-AzContext -Subscription $oSubscription 
+    Write-Host "Context set to Subscription: $($oSubscription.Name) '$($oSubscription.Id)'" -ForegroundColor Magenta
+
+    $Context | Out-String | Write-Verbose
+        
 
     # Ensure the resource group exists, otherwise deploy it
-    Try{
+    Try
+    {
         $oResourceGroup = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction Stop
     }
-    catch{
-        Write-Verbose "Resource Group $ResourceGroupName does not exist. Creating Resource Group"
+    catch
+    {
+        Write-Host "Resource Group $ResourceGroupName does not exist. Creating Resource Group" -ForegroundColor Blue
     }
     if (!($oResourceGroup))
     {
@@ -97,53 +131,39 @@ foreach ($oSubscription in $oSubscriptions)
     else
     {
         Write-Verbose "Resource Group Found"
-        if ($VerbosePreference -notlike "SilentlyContinue")
-        {
-            $oResourceGroup
-        }
+        $oResourceGroup | Out-String | Write-Verbose
     }
 
     # Get All Resources in the subscription
     $oResources = Get-AzResource
     if ($VerbosePreference -notlike "SilentlyContinue")
     {
-        Write-Verbose "'$($Resource.Count)' resources found"
+        Write-Verbose "'$($oResources.Count)' resources found"
 
-        $oResources | Group-Object -Property Type | Sort-Object -Property Count -Descending | Select-Object -Property Name,Count | Format-table -autosize
+        $oResources | Group-Object -Property Type | Sort-Object -Property Count -Descending | Select-Object -Property Name, Count | Format-Table -AutoSize | Out-String | Write-Verbose
     }
-
     
-   # Virtual Machine Metric Alerts ######################### 
-   
-    $oVirtualMachines = $oResources | Where-Object ResourceType -Like "Microsoft.Compute/virtualMachines"
-        
-    if ($oVirtualMachines)
+    foreach ($oResourceType in $oTemplatesHash.Keys)
     {
-        $oVMPath = "$oTemplateRootPath\microsoft.compute_virtualmachines"
-        Try
+        Write-Host "Initialising Alert Deployment for Resource Type: '$oResourceType'" -ForegroundColor Magenta
+        $oFilteredResources = $oResources | Where-Object ResourceType -Like $oResourceType
+        if ($oFilteredResources)
         {
-            Set-Location $oVMPath -ErrorAction Stop
-        }
-        catch
-        {
-            Write-Error $Error[0]
-            Write-Error -Message "Failed to set the location for virtual machines, ensure directoy and templates exsit"
-            break
-        }
+            Write-Verbose "'$($oFilteredResources.Count)$oResourceType' found"
+            if ($oTemplatesHash.$oResourceType.pathTest -eq $true )
+            {
+                $oCommand = "$($oTemplatesHash.$oResourceType.scriptName)" 
+                $oVerboseString = "Executing Script: $oCommand" + ' -Subscription $Subscription -ResourceGroup $oResourceGroup -Resources $oFilteredResources'
+                Write-Verbose $oVerboseString
 
-        $DeployAzVMMetricsAlertsHashArguments = @{
-            VirtualMachines = $oVirtualMachines
-            Subscription    = $oSubscription
-            ResourceGroup   = $oResourceGroup
-        }      
-        .\DeployAzVMMetricsAlerts.ps1 @DeployAzVMMetricsAlertsHashArguments
+                & $oCommand -Subscription $Subscription -ResourceGroup $oResourceGroup -Resources $oFilteredResources 
+            }
+        }
+        else
+        {
+            Write-Verbose "No Resources of Type '$oResourceType' found."
+        }
     }
-
-    # Log Alerts
-    Set-Location $oTemplateRootPath
-
 }
 
-
-
-
+    Write-Verbose "`n`n`n## DeployAzAlerts End ##################################################################`n"

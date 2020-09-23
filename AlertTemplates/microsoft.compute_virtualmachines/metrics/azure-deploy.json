@@ -1,0 +1,101 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "resourceId": {
+            "type": "string"
+        },
+        "memoryAvaliableBytes_Threshold": {
+            "type": "string",
+            "defaultValue": "2147483648",
+            "metadata": {
+                "description": "The threshold value at which the alert is activated."
+            }
+        },
+        "memoryAvaliableBytes_WindowSize": {
+            "type": "string",
+            "defaultValue": "PT15M",
+            "allowedValues": [
+                "PT1M",
+                "PT5M",
+                "PT15M",
+                "PT30M",
+                "PT1H",
+                "PT6H",
+                "PT12H",
+                "PT24H"
+            ],
+            "metadata": {
+                "description": "Period of time used to monitor alert activity based on the threshold. Must be between one minute and one day. ISO 8601 duration format."
+            }
+        },
+        "memoryAvaliableBytes_EvaluationFrequency": {
+            "type": "string",
+            "defaultValue": "PT15M",
+            "allowedValues": [
+                "PT1M",
+                "PT5M",
+                "PT15M",
+                "PT30M"
+            ],
+            "metadata": {
+                "description": "How often the metric alert is evaluated represented in ISO 8601 duration format"
+            }
+        },
+        "memoryAvaliableBytes_alertSeverity": {
+            "type": "int",
+            "defaultValue": 3,
+            "allowedValues": [
+                0,
+                1,
+                2,
+                3,
+                4
+            ],
+            "metadata": {
+                "description": "Severity of alert {0,1,2,3,4}"
+            }
+        }
+    },
+    "variables": {
+        "memoryAvaliableBytes_name": "Memory Bytes Alert"
+    },
+    "resources": [
+        {
+            "type": "microsoft.insights/metricAlerts",
+            "apiVersion": "2018-03-01",
+            "name": "[variables('memoryAvaliableBytes_name')]",
+            "location": "global",
+            "properties": {
+                "severity": "[parameters('memoryAvaliableBytes_alertSeverity')]",
+                "enabled": false,
+                "scopes": [
+                    "[parameters('resourceId')]"
+                ],
+                "evaluationFrequency": "[parameters('memoryAvaliableBytes_EvaluationFrequency')]",
+                "windowSize": "[parameters('memoryAvaliableBytes_WindowSize')]",
+                "criteria": {
+                    "allOf": [
+                        {
+                            "threshold": "[parameters('memoryAvaliableBytes_Threshold')]",
+                            "name": "Metric1",
+                            "metricNamespace": "azure.vm.windows.guestmetrics",
+                            "metricName": "Memory\\Available Bytes",
+                            "dimensions": [],
+                            "operator": "LessThan",
+                            "timeAggregation": "Average",
+                            "criterionType": "StaticThresholdCriterion",
+                            "skipMetricValidation": true
+                        }
+                    ],
+                    "odata.type": "Microsoft.Azure.Monitor.MultipleResourceMultipleMetricCriteria"
+                },
+                "autoMitigate": true,
+                "targetResourceType": "Microsoft.Compute/virtualMachines",
+                "targetResourceRegion": "[resourceGroup().location]",
+                "actions": [],
+                "description": ""
+            }
+        }
+    ]
+}
