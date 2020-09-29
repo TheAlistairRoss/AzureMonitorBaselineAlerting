@@ -26,39 +26,107 @@ param (
     $ResourceGroupName,
 
     [string]
-    $ResourceGroupLocation
-
+    $ResourceGroupLocation,
+    
+    # Location of the file "DeployAzAlerts.config.json". This is only required if not in the same directory as this script
+    [string]
+    $ConfigFilePath
 )
 
 Write-Verbose "`n`n`n## DeployAzAlerts Start ##################################################################`n"
 
-## Test each File Path
-$oConfigFile = "DeployAzAlerts.config.json"
-$oConfig = Get-Content $oConfigFile | ConvertFrom-Json -AsHashtable
+## Test each and configure config file
+$oConfigFile = "deployAzAlerts.config.json"
+$ConfigFilePath = $ConfigFilePath.Trim("\")
+$oTemplateFileName = "azure-deploy.json"
+$oTemplateParametersFileName = "azure-deploy.parameters.json"
 
-Foreach ($oConfigResourceType in $oConfig.keys)
+if ($ConfigFilePath)
 {
-    foreach ($oScript in $oConfig.$oConfigResourceType.scripts)
+    if ((Test-Path -Path $ConfigFilePath) -ne $true)
     {
-        $oPath = "$PSScriptRoot\$($oConfig.$oConfigResourceType.resourceScriptdirectory)\$($oConfig.$oConfigResourceType.resourceScriptDirectory)\$($oScript.directory)\$($oScript.scriptName)"
+        $oErrorString = "Path: '$ConfigFilePath' not found. Exiting Script"
+        exit
+    }
+    else
+    {
+        $oVerboseString = "Path: '$ConfigFilePath' found. Testing config file" 
+    }
+}
+else
+{
+    $ConfigFilePath = $PSScriptRoot
+    $oVerboseString = "Setting Config File path to '$ConfigFilePath'"
+    Write-Verbose $oVerboseString
+}
+    
+if ($ConfigFilePath -notlike "$ConfigFilePath\$oConfigFile")
+{
+    $oConfigFile = "$ConfigFilePath\$oConfigFile"
+    $oVerboseString = "Setting `$oConfigFile to '$oConfigFile'"
+    Write-Verbose $oVerboseString
+}
+if ((Test-Path -Path $oConfigFile) -ne $true)
+{
+    $oErrorString = "Path: '$oConfigFile' not found. Exiting Script"
+    exit
+}
+else
+{
+    $oHostString = "File '$oConfigFile' found. Getting Content"
+    Write-Verbose $oHostString
+
+    $oConfigFileDirectory = (Get-Item -Path $oConfigFile).Directory.FullName
+}
+
+# Get Config File Content
+try
+{
+    $oConfig = Get-Content $oConfigFile -ErrorAction Stop | ConvertFrom-Json -AsHashtable -ErrorAction Stop
+}
+catch
+{
+    Write-Error $Error[0]
+    exit
+}
+
+# Test Config File settings
+foreach ($oConfigResourceType in $oConfig.keys)
+{
+    foreach ($oTemplateDirectory in $oConfig.$oConfigResourceType.templateDirectories)
+    {
+        $oPath = "$oConfigFileDirectory\$($oConfig.$oConfigResourceType.resourceTemplateDirectory)\$($oTemplateDirectory.directory)"
         If ((Test-Path -Path $oPath) -eq $false)
         {
             $oErrorString = "Path '$oPath' not found. Ensure valid template directory." 
             Write-Error -Message $oErrorString
-            $oScript.pathTest = $false
+            $oTemplateDirectory.pathTest = $false
+            exit
         }
         else
         {
             $oVerboseString = "Path '$oPath' found." 
             Write-Verbose $oVerboseString
-            $oScript.scriptName = $oPath
-            $oScript.pathTest = $true
+            $oTemplateDirectory.directory = $oPath
+
+            Foreach ($file in @($oTemplateFileName, $oTemplateParametersFileName))
+            {
+                $oFileFullPath = "$($oTemplateDirectory.directory)\$file"
+                if ((Test-Path -Path $oFileFullPath) -eq $false)
+                {
+                    $oErrorString = "Path '$oFileFullPath' not found. 'Ensure azure-deploy.json' and 'azure-deploy.parameters.json' exists in the directory"
+                    Write-Error -Message $oErrorString
+                    exit
+                }
+            }
+            $oTemplateDirectory.pathTest = $true
         }
     }
 }
+
 $oVerboseString = "Path Test Results"
 Write-Verbose $oVerboseString
-$oConfig | ConvertTo-Json -EnumsAsString | Write-Verbose 
+$oConfig | ConvertTo-Json -EnumsAsString -Depth 5 | Write-Verbose 
 
 
 # Validate PowerShell
@@ -66,7 +134,7 @@ if ($PSVersionTable.PSVersion -lt $Version)
 {
     $oErrorString = "PowerShell Version is '$($PSVersionTable.PSVersion)' and requires upgrading to Version 6"
     Write-Error -Message $oErrorString
-    Exit
+    exit
 }
 else
 {
@@ -162,17 +230,30 @@ foreach ($oSubscription in $oSubscriptions)
             $oVerboseString = "'$($oFilteredResources.Count)' of Resource Type '$oResourceType' found"
             Write-Verbose $oVerboseString
 
-            foreach ($oScript in $oConfig.$oResourceType.scripts)
+            foreach ($oTemplateDirectory in $oConfig.$oResourceType.templateDirectories)
             {
-                if ($oScript.pathTest -like $true)
+                if ($oTemplateDirectory.pathTest -like $true -and $oTemplateDirectory.directory -match "\\multiResourceMetrics")
                 {
-                    $oCommand = "$($oScript.scriptName)"
-
-                    $oVerboseString = "Script: $oCommand -Subscription `$oSubscription -ResourceGroup `$oResourceGroup -Resources `$oFilteredResources"
+                    $oCommand = "$PSScriptRoot\DeployAzMultiResourceMetricsAlerts.PS1"
+                    $oVerboseString = "Setting Command to $oCommand"
                     Write-Verbose $oVerboseString
-
-                    & $oCommand -Subscription $oSubscription -ResourceGroup $oResourceGroup -Resources $oFilteredResources 
                 }
+                elseif ($oTemplateDirectory.pathTest -like $true -and $oTemplateDirectory.directory -match "\\metrics")
+                {
+                    $oCommand = "$PSScriptRoot\DeployAzMetricsAlerts.PS1"
+                    $oVerboseString = "Setting Command to $oCommand"
+                    Write-Verbose $oVerboseString
+                }
+                else
+                {
+                    $oErrorString = "Path test or resource directory not correct. Review previous test results"
+                    Write-Error $oErrorString
+                    Break
+                }
+                $oVerboseString = "Script: $oCommand -Subscription `$oSubscription -ResourceGroup `$oResourceGroup -Resources `$oFilteredResources -ConfigDirectory `$oTemplateDirectory.directory"
+                Write-Verbose $oVerboseString
+
+                & $oCommand -Subscription $oSubscription -ResourceGroup $oResourceGroup -Resources $oFilteredResources -ConfigDirectory $oTemplateDirectory.directory
             }
         }
         else
@@ -181,7 +262,7 @@ foreach ($oSubscription in $oSubscriptions)
             Write-Host $oHostString -ForegroundColor Blue
         }
     }
-        
-}
+} 
 
-Write-Verbose "`n`n`n## DeployAzAlerts End ##################################################################`n"
+
+    Write-Verbose "`n`n`n## DeployAzAlerts End ##################################################################`n"

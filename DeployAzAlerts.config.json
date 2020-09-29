@@ -1,0 +1,14 @@
+{
+    "Microsoft.Compute/virtualMachines": {
+        "resourceDisplayName": "Azure Virtual Machines",
+        "resourceTemplateDirectory": "Microsoft.Compute_virtualMachines",
+        "templateDirectories": [
+            {
+                "directory": "multiResourceMetrics"
+            },
+            {
+                "directory": "metrics"
+            }
+        ]
+    }
+}

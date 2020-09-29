@@ -2,8 +2,8 @@
     "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
     "contentVersion": "1.0.0.0",
     "parameters": {
-        "resourceId": {
-            "type": "string"
+        "resourceIds": {
+            "type": "array"
         },
         "memoryAvaliableBytes_Threshold": {
             "type": "string",
@@ -58,19 +58,26 @@
         }
     },
     "variables": {
-        "memoryAvaliableBytes_name": "[concat('Memory Bytes Alert','-',guid(parameters('resourceId')))]"
+        "memoryAvaliableBytes_Name": "Memory Avaliable Bytes",
+        "copy": [
+            {
+                "name": "memoryAvaliableBytes_copy",
+                "count": "[length(parameters('resourceIds'))]",
+                "input": "[parameters('resourceIds')[copyIndex('memoryAvaliableBytes_copy')]]"
+            }
+        ]
     },
     "resources": [
         {
             "type": "microsoft.insights/metricAlerts",
             "apiVersion": "2018-03-01",
-            "name": "[variables('memoryAvaliableBytes_name')]",
+            "name": "[concat(variables('memoryAvaliableBytes_Name'),'_',guid(parameters('resourceIds')[copyIndex(0)]))]",
             "location": "global",
             "properties": {
                 "severity": "[parameters('memoryAvaliableBytes_alertSeverity')]",
                 "enabled": false,
                 "scopes": [
-                    "[parameters('resourceId')]"
+                    "[parameters('resourceIds')[copyIndex(0)]]"
                 ],
                 "evaluationFrequency": "[parameters('memoryAvaliableBytes_EvaluationFrequency')]",
                 "windowSize": "[parameters('memoryAvaliableBytes_WindowSize')]",
@@ -95,6 +102,10 @@
                 "targetResourceRegion": "[resourceGroup().location]",
                 "actions": [],
                 "description": ""
+            },
+            "copy": {
+                "name": "[concat(variables('memoryAvaliableBytes_name'),'_copy')]",
+                "count": "[length(parameters('resourceIds'))]"
             }
         }
     ]

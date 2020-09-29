@@ -10,10 +10,27 @@ param (
 
     [Parameter(Mandatory = $true)]
     [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResource[]]
-    $Resources
+    $Resources,
+
+    [Parameter(Mandatory = $true)]
+    [string]
+    $ConfigDirectory
 
 )
-Write-Verbose "`n`n`n## DeployAzMultiResourceMetrics Start ##################################################################`n"
+Write-Verbose "`n`n`n## DeployAzMetricsAlert Start ##################################################################`n"
+
+# Validate Directory
+$oDirectoryTest = Test-Path -Path $ConfigDirectory
+If ($oDirectoryTest -ne $true){
+    $oErrorString = "Path: '$ConfigDirectory' not found. Exiting Script"
+    Write-Error -Message $oErrorString
+    exit
+}
+else {
+    $oVerboseString = "Path: '$ConfigDirectory'  found."
+    Write-Verbose $oVerboseString
+}
+
 
 ## Validate Resources
 $oVerboseString = "'$($Resources.Count)' of Resources"
@@ -31,13 +48,13 @@ if ($oResourceTypeUnique.count -gt 1 )
 }
 else
 {
-    $oVerboseString = "Deploying Multi Resource Metrics for Resource type '$oResourceTypeUnique'"
+    $oVerboseString = "Deploying Metrics for Resource type '$oResourceTypeUnique'"
     Write-Verbose $oVerboseString
 }
 
 # Validate Template Files
-$oTemplateFileName = "$PSScriptRoot\azure-deploy.json"
-$oTemplateParametersFileName = "$PSScriptRoot\azure-deploy.parameters.json"
+$oTemplateFileName = "$ConfigDirectory\azure-deploy.json"
+$oTemplateParametersFileName = "$ConfigDirectory\azure-deploy.parameters.json"
 
 @($oTemplateFileName , $oTemplateParametersFileName) | ForEach-Object {
     If ((Test-Path -Path $_) -eq $false)
@@ -60,19 +77,17 @@ Write-Verbose $oVerboseString
 $oVerboseString = "Resource Group Deployment to '$($ResourceGroup.ResourceGroupName)'"
 Write-Verbose $oVerboseString
 
-# Get Resources Unique Locations
-$oResourceLocations = @()
-$Resources.Location | Select-Object -Unique | ForEach-Object { $oResourceLocations += $_ }
-$oVerboseString = "'$($oResourceLocations.count)' unique locations for resource type found"
-Write-Verbose $oVerboseString
-$oResourceLocations |out-string |Write-Verbose
-
+$oResourceIdsArray = @()
+foreach ($oResource in $Resources)
+{
+    $oResourceIdsArray += $oResource.Id
+}
+    
 $oParamsFile = Get-Content -Path $oTemplateParametersFileName | ConvertFrom-Json -AsHashtable
-$oparamsFile.parameters.locations.value = $oResourceLocations 
-$oParamsFile.parameters.multiResourceMetricAlertScope.value = $oSubscriptionScope
+$oParamsFile.parameters.resourceIds.value = $oResourceIdsArray
 
 $oDateTime = Get-Date -Format "yyyyMMddhhmmss"
-$oDeploymentName = "multiResourceMetric_alerts-$oDateTime"
+$oDeploymentName = "Metric_alerts-$oDateTime"
 
 # Compile the arguments to a hashtable
 $HashArguments = @{
@@ -84,12 +99,12 @@ $HashArguments = @{
 
 $oParamsFileKeys = $oParamsFile.parameters.keys -split "`n"
 
-Foreach ($oKey in $oParamsFileKeys)
+foreach ($oKey in $oParamsFileKeys)
 {
     $HashArguments.Add($oKey, $oParamsFile.parameters.$oKey.value)
 }
 
-If ($DebugPreference -notlike "SilentlyContinue")
+if ($DebugPreference -notlike "SilentlyContinue")
 {
     $oTemplate = Get-Content -Path $oTemplateFileName -Raw
     $oParametersFinal = $oParamsFile | ConvertTo-Json
@@ -99,9 +114,9 @@ If ($DebugPreference -notlike "SilentlyContinue")
     Write-Debug "`n## Parameters File ##################################################################`n"
     Write-Debug $oParametersFinal
 }
-
-$oHostString = "Deploying Multi Resource Metrics to Scope '$oSubscriptionScope'" 
-Write-Host $oHostString -Foregroundcolor Magenta
+$oHostString = "Deploying Metrics Alerts for Resource Type '$($oResourceTypeUnique)'" 
+Write-Host $oHostString -ForegroundColor Magenta
 New-AzResourceGroupDeployment @HashArguments
 
-Write-Verbose "`n`n`n## DeployAzMultiResourceMetrics End ##################################################################`n"
+
+Write-Verbose "`n`n`n## DeployAzMetricsAlert End ##################################################################`n"
