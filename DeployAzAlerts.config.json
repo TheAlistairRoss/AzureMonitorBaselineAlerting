@@ -1,5 +1,5 @@
 {
-/*     "Microsoft.Compute/virtualMachines": {
+     "Microsoft.Compute/virtualMachines": {
         "resourceDisplayName": "Azure Virtual Machines",
         "resourceTemplateDirectory": "Microsoft.Compute_virtualMachines",
         "templateDirectories": [
@@ -10,7 +10,7 @@
                 "directory": "metrics"
             }
         ]
-    }, */
+    }, 
     "Subscription": {
         "resourceDisplayName": "Subscription Activity Log",
         "resourceTemplateDirectory": "SubscriptionAlerts",
