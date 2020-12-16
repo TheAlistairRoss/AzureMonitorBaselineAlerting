@@ -7,17 +7,17 @@ param (
     [Parameter(Mandatory = $true)]
     [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResourceGroup]
     $ResourceGroup,
-
+<#
     [Parameter(Mandatory = $true)]
     [Microsoft.Azure.Commands.ResourceManager.Cmdlets.SdkModels.PSResource[]]
     $Resources,
-
+#>
     [Parameter(Mandatory = $true)]
     [string]
     $ConfigDirectory
 
 )
-Write-Host "`n`n`n## DeployAzMetricsAlert Start ##################################################################`n"
+Write-Host "`n`n`n## DeployAzActivityLogAlert Start ##################################################################`n"
 
 # Validate Directory
 $oDirectoryTest = Test-Path -Path $ConfigDirectory
@@ -31,7 +31,7 @@ else {
     Write-Host $oHostString
 }
 
-
+<#
 ## Validate Resources
 $oHostString = "'$($Resources.Count)' of Resources"
 Write-Host $oHostString
@@ -51,6 +51,7 @@ else
     $oHostString = "Deploying Metrics for Resource type '$oResourceTypeUnique'"
     Write-Host $oHostString
 }
+#>
 
 # Validate Template Files
 $oTemplateFileName = "$ConfigDirectory\azure-deploy.json"
@@ -69,7 +70,7 @@ $oTemplateParametersFileName = "$ConfigDirectory\azure-deploy.parameters.json"
     }
 }
 
-
+<#
 # Build the subscription scope
 $oSubscriptionScope = "/subscriptions/$($subscription.Id)"
 $oHostString = "Scope set to Subscription '$oSubscriptionScope $($Subscription.Name)"
@@ -82,12 +83,13 @@ foreach ($oResource in $Resources)
 {
     $oResourceIdsArray += $oResource.Id
 }
-    
+#>
+
 $oParamsFile = Get-Content -Path $oTemplateParametersFileName | ConvertFrom-Json -AsHashtable
-$oParamsFile.parameters.resourceIds.value = $oResourceIdsArray
+#$oParamsFile.parameters.resourceIds.value = $oResourceIdsArray
 
 $oDateTime = Get-Date -Format "yyyyMMddhhmmss"
-$oDeploymentName = "Metric_alerts-$oDateTime"
+$oDeploymentName = "Activity_Log_alerts-$oDateTime"
 
 # Compile the arguments to a hashtable
 $HashArguments = @{
@@ -114,9 +116,9 @@ if ($VerbosePreference -notlike "SilentlyContinue")
     Write-Verbose "`n## Parameters File ##################################################################`n"
     Write-Verbose $oParametersFinal
 }
-$oHostString = "Deploying Metrics Alerts for Resource Type '$($oResourceTypeUnique)'" 
+$oHostString = "Deploying Activity Log Alerts for Resource Type '$($oResourceTypeUnique)'" 
 Write-Host $oHostString -ForegroundColor Magenta
 New-AzResourceGroupDeployment @HashArguments
 
 
-Write-Host "`n`n`n## DeployAzMetricsAlert End ##################################################################`n"
+Write-Host "`n`n`n## DeployAzActivityLogAlert End ##################################################################`n"

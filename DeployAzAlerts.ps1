@@ -27,13 +27,26 @@ param (
 
     [string]
     $ResourceGroupLocation,
-    
+
     # Location of the file "DeployAzAlerts.config.json". This is only required if not in the same directory as this script
     [string]
     $ConfigFilePath
 )
 
 Write-Verbose "`n`n`n## DeployAzAlerts Start ##################################################################`n"
+
+# Validate PowerShell
+if ($PSVersionTable.PSVersion -lt $Version)
+{
+    $oErrorString = "PowerShell Version is '$($PSVersionTable.PSVersion)' and requires upgrading to Version 6"
+    Write-Error -Message $oErrorString
+    exit
+}
+else
+{
+    $oVerboseString = "PowerShell Version = $($PSVersionTable.PSVersion)"
+    Write-Verbose $oVerboseString
+}
 
 ## Test each and configure config file
 $oConfigFile = "deployAzAlerts.config.json"
@@ -129,19 +142,6 @@ Write-Verbose $oVerboseString
 $oConfig | ConvertTo-Json -EnumsAsString -Depth 5 | Write-Verbose 
 
 
-# Validate PowerShell
-if ($PSVersionTable.PSVersion -lt $Version)
-{
-    $oErrorString = "PowerShell Version is '$($PSVersionTable.PSVersion)' and requires upgrading to Version 6"
-    Write-Error -Message $oErrorString
-    exit
-}
-else
-{
-    $oVerboseString = "PowerShell Version = $($PSVersionTable.PSVersion)"
-    Write-Verbose $oVerboseString
-}
-
 # This needs to be update if automating with a service principal / app registration / managed identity
 # Connect-AzAccount 
 
@@ -210,13 +210,38 @@ foreach ($oSubscription in $oSubscriptions)
         Write-Verbose $oVerboseString
         $oResourceGroup | Out-String | Write-Verbose
     }
+    # Deploy Subscription Scoped Activity Alerts
+
+    If ($oConfig.Subscription.templateDirectories)
+    {
+        $oHostString = "Deploying Subscription Activity Alerts"
+        Write-Host $oHostString -ForegroundColor Blue
+        $oTemplateDirectory = $oConfig.Subscription.templateDirectories
+        if ($oTemplateDirectory.pathTest -like $true -and $oTemplateDirectory.directory -match "\\ActivityLog")
+        {
+            $oCommand = "$PSScriptRoot\DeployAzActivityLogAlerts.PS1"
+            $oVerboseString = "Setting Command to $oCommand"
+            Write-Verbose $oVerboseString
+        }
+        else
+        {
+            $oErrorString = "Path test or resource directory not correct. Review previous test results"
+            Write-Error $oErrorString
+            Break
+        }
+        $oVerboseString = "Script: $oCommand -Subscription `$oSubscription -ResourceGroup `$oResourceGroup -ConfigDirectory `$oTemplateDirectory.directory"
+        Write-Verbose $oVerboseString
+
+        & $oCommand -Subscription $oSubscription -ResourceGroup $oResourceGroup -ConfigDirectory $oTemplateDirectory.directory
+    }
+
 
     # Get All Resources in the subscription
     $oResources = Get-AzResource
     if ($VerbosePreference -notlike "SilentlyContinue")
     {
-        $oVerboseString = "'$($oResources.Count)' resources found"
-        Write-Verbose $oVerboseString
+        $oHostString = "'$($oResources.Count)' resources found"
+        Write-Host $oHostString -ForegroundColor Blue
         $oResources | Group-Object -Property Type | Sort-Object -Property Count -Descending | Select-Object -Property Name, Count | Format-Table -AutoSize | Out-String | Write-Verbose
     }
     

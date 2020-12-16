@@ -17,7 +17,7 @@ param (
     $ConfigDirectory
 
 )
-Write-Verbose "`n`n`n## DeployAzMultiResourceMetrics Start ##################################################################`n"
+Write-Host "`n`n`n## DeployAzMultiResourceMetrics Start ##################################################################`n"
 
 # Validate Directory
 $oDirectoryTest = Test-Path -Path $ConfigDirectory
@@ -27,15 +27,15 @@ If ($oDirectoryTest -ne $true){
     exit
 }
 else {
-    $oVerboseString = "Path: '$ConfigDirectory'  found."
-    Write-Verbose $oVerboseString
+    $oHostString = "Path: '$ConfigDirectory'  found."
+    Write-Host $oHostString
 }
 
 ## Validate Resources
-$oVerboseString = "'$($Resources.Count)' of Resources"
-Write-Verbose $oVerboseString
-$oVerboseString = $Resources | Select-Object Name, ResourceType, ResourceGroupName | Out-String
-Write-Verbose $oVerboseString
+$oHostString = "'$($Resources.Count)' of Resources"
+Write-Host $oHostString
+$oHostString = $Resources | Select-Object Name, ResourceType, ResourceGroupName | Out-String
+Write-Host $oHostString
 
 $oResourceTypeUnique = $Resource | Select-Object -Property ResourceType -Unique
 if ($oResourceTypeUnique.count -gt 1 )
@@ -47,8 +47,8 @@ if ($oResourceTypeUnique.count -gt 1 )
 }
 else
 {
-    $oVerboseString = "Deploying Multi Resource Metrics for Resource type '$oResourceTypeUnique'"
-    Write-Verbose $oVerboseString
+    $oHostString = "Deploying Multi Resource Metrics for Resource type '$oResourceTypeUnique'"
+    Write-Host $oHostString
 }
 
 # Validate Template Files
@@ -63,25 +63,25 @@ $oTemplateParametersFileName = "$ConfigDirectory\azure-deploy.parameters.json"
     }
     else
     {
-        $oVerboseString = "Path '$_' found"
-        Write-Verbose $oVerboseString
+        $oHostString = "Path '$_' found"
+        Write-Host $oHostString
     }
 }
 
 
 # Build the subscription scope
 $oSubscriptionScope = "/subscriptions/$($subscription.Id)"
-$oVerboseString = "Scope set to Subscription '$oSubscriptionScope $($Subscription.Name)"
-Write-Verbose $oVerboseString
-$oVerboseString = "Resource Group Deployment to '$($ResourceGroup.ResourceGroupName)'"
-Write-Verbose $oVerboseString
+$oHostString = "Scope set to Subscription '$oSubscriptionScope $($Subscription.Name)"
+Write-Host $oHostString
+$oHostString = "Resource Group Deployment to '$($ResourceGroup.ResourceGroupName)'"
+Write-Host $oHostString
 
 # Get Resources Unique Locations
 $oResourceLocations = @()
 $Resources.Location | Select-Object -Unique | ForEach-Object { $oResourceLocations += $_ }
-$oVerboseString = "'$($oResourceLocations.count)' unique locations for resource type found"
-Write-Verbose $oVerboseString
-$oResourceLocations |out-string |Write-Verbose
+$oHostString = "'$($oResourceLocations.count)' unique locations for resource type found"
+Write-Host $oHostString
+$oResourceLocations |out-string |Write-Host
 
 $oParamsFile = Get-Content -Path $oTemplateParametersFileName | ConvertFrom-Json -AsHashtable
 $oparamsFile.parameters.locations.value = $oResourceLocations 
@@ -105,19 +105,19 @@ Foreach ($oKey in $oParamsFileKeys)
     $HashArguments.Add($oKey, $oParamsFile.parameters.$oKey.value)
 }
 
-If ($DebugPreference -notlike "SilentlyContinue")
+If ($VerbosePreference -notlike "SilentlyContinue")
 {
     $oTemplate = Get-Content -Path $oTemplateFileName -Raw
     $oParametersFinal = $oParamsFile | ConvertTo-Json
 
-    Write-Debug "`n## Template File ####################################################################`n"
-    Write-Debug $oTemplate
-    Write-Debug "`n## Parameters File ##################################################################`n"
-    Write-Debug $oParametersFinal
+    Write-Verbose "`n## Template File ####################################################################`n"
+    Write-Verbose $oTemplate
+    Write-Verbose "`n## Parameters File ##################################################################`n"
+    Write-Verbose $oParametersFinal
 }
 
 $oHostString = "Deploying Multi Resource Metrics to Scope '$oSubscriptionScope'" 
 Write-Host $oHostString -Foregroundcolor Magenta
 New-AzResourceGroupDeployment @HashArguments
 
-Write-Verbose "`n`n`n## DeployAzMultiResourceMetrics End ##################################################################`n"
+Write-Host "`n`n`n## DeployAzMultiResourceMetrics End ##################################################################`n"
